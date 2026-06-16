@@ -13,7 +13,8 @@ dependencies:
     - accelerate==1.1.1
     - datasets==3.1.0
     - deepspeed==0.15.4
-    - nvidia-cuda-nvcc-cu12  # provides nvcc binary for DeepSpeed CUDA_HOME detection
+    - nvidia-cuda-nvcc-cu12  # nvcc binary (site-packages/nvidia/cuda_nvcc/bin/nvcc); run_RL_training.sh symlinks it to $CONDA_PREFIX/bin/nvcc automatically
+    - nvidia-curand-cu12     # libcurand.so.10 (site-packages/nvidia/curand/lib/); run_RL_training.sh symlinks it to $CONDA_PREFIX/lib/ for DeepSpeed cpu_adam JIT build
 
     # HuggingFace ML stack (pinned to match mumo_requirements.txt)
     - transformers==4.51.3  # >=4.48.2 for vllm; <4.52 avoids keep_torch_compile arg not yet in accelerate 1.1.1

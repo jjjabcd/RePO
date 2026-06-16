@@ -4,14 +4,55 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Optional: ensure CUDA/C++ libs from conda env are visible
+# ---------------------------------------------------------------------------
+# CUDA / DeepSpeed environment setup (runs on every server after conda env create)
+#
+# nvidia-cuda-nvcc-cu12  installs nvcc  under site-packages/nvidia/cuda_nvcc/bin/
+# nvidia-curand-cu12     installs libcurand under site-packages/nvidia/curand/lib/
+# DeepSpeed expects both at $CUDA_HOME/bin/nvcc and $CONDA_PREFIX/lib/libcurand.so
+# → auto-symlink once if missing so no manual steps are needed on a fresh env.
+# ---------------------------------------------------------------------------
 if [[ -n "${CONDA_PREFIX:-}" ]]; then
   export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
-  # Set CUDA_HOME so DeepSpeed can locate nvcc (symlink nvcc into $CONDA_PREFIX/bin first via
-  # `pip install nvidia-cuda-nvcc-cu12` then `ln -sf ... $CONDA_PREFIX/bin/nvcc`)
   export CUDA_HOME="${CUDA_HOME:-${CONDA_PREFIX}}"
-  if [[ ! -f "${CUDA_HOME}/bin/nvcc" ]]; then
-    echo "[run_RL_training.sh] WARNING: nvcc not found at ${CUDA_HOME}/bin/nvcc — DeepSpeed may fail" >&2
+
+  # --- nvcc ---
+  if [[ ! -f "${CONDA_PREFIX}/bin/nvcc" ]]; then
+    _nvcc="$(python -c "
+import os
+try:
+    import nvidia.cuda_nvcc as m
+    p = os.path.join(os.path.dirname(m.__file__), 'bin', 'nvcc')
+    print(p) if os.path.isfile(p) else None
+except ImportError:
+    pass
+" 2>/dev/null || true)"
+    if [[ -n "${_nvcc:-}" ]]; then
+      ln -sf "$_nvcc" "${CONDA_PREFIX}/bin/nvcc"
+      echo "[run_RL_training.sh] Linked nvcc: ${CONDA_PREFIX}/bin/nvcc → $_nvcc" >&2
+    else
+      echo "[run_RL_training.sh] WARNING: nvcc not found — install nvidia-cuda-nvcc-cu12" >&2
+    fi
+  fi
+
+  # --- libcurand (required by DeepSpeed cpu_adam JIT build) ---
+  if [[ ! -f "${CONDA_PREFIX}/lib/libcurand.so" ]]; then
+    _curand="$(python -c "
+import os
+try:
+    import nvidia.curand as m
+    p = os.path.join(os.path.dirname(m.__file__), 'lib', 'libcurand.so.10')
+    print(p) if os.path.isfile(p) else None
+except ImportError:
+    pass
+" 2>/dev/null || true)"
+    if [[ -n "${_curand:-}" ]]; then
+      ln -sf "$_curand" "${CONDA_PREFIX}/lib/libcurand.so.10" 2>/dev/null || true
+      ln -sf "${CONDA_PREFIX}/lib/libcurand.so.10" "${CONDA_PREFIX}/lib/libcurand.so" 2>/dev/null || true
+      echo "[run_RL_training.sh] Linked libcurand in ${CONDA_PREFIX}/lib/" >&2
+    else
+      echo "[run_RL_training.sh] WARNING: libcurand not found — install nvidia-curand-cu12" >&2
+    fi
   fi
 fi
 
