@@ -7,16 +7,26 @@ cd "$ROOT_DIR"
 # Optional: ensure CUDA/C++ libs from conda env are visible
 if [[ -n "${CONDA_PREFIX:-}" ]]; then
   export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+  # Set CUDA_HOME so DeepSpeed can locate nvcc (symlink nvcc into $CONDA_PREFIX/bin first via
+  # `pip install nvidia-cuda-nvcc-cu12` then `ln -sf ... $CONDA_PREFIX/bin/nvcc`)
+  export CUDA_HOME="${CUDA_HOME:-${CONDA_PREFIX}}"
+  if [[ ! -f "${CUDA_HOME}/bin/nvcc" ]]; then
+    echo "[run_RL_training.sh] WARNING: nvcc not found at ${CUDA_HOME}/bin/nvcc — DeepSpeed may fail" >&2
+  fi
 fi
+
+# rewards.py initialises OpenAI client at import time with api_key=""; openai>=2 rejects empty
+# keys unless OPENAI_API_KEY is set. Set a dummy so init succeeds (mumo never calls this reward).
+export OPENAI_API_KEY="${OPENAI_API_KEY:-dummy}"
 
 # Defaults (override via env vars or CLI flags)
 # export WANDB_MODE="${WANDB_MODE:-offline}"
-GPUS="${GPUS:-5,6,7}"
+GPUS="${GPUS:-0,1}"          # machine has 2 GPUs (index 0,1)
 ENTRY="${ENTRY:-src/x_r1/repo.py}"
 VARIANT="${VARIANT:-}"
 CONFIG="${CONFIG:-recipes/OpenMolIns_3B_config.yaml}"
 ACCELERATE_CONFIG="${ACCELERATE_CONFIG:-recipes/zero3.yaml}"
-NUM_PROCESSES="${NUM_PROCESSES:-2}"
+NUM_PROCESSES="${NUM_PROCESSES:-1}"  # use_vllm=true takes 1 GPU; leave 1 GPU for vLLM
 PORT="${PORT:-29500}"
 LOG_DIR="${LOG_DIR:-./logs}"
 LOG_FILE="${LOG_FILE:-}"
@@ -30,7 +40,7 @@ Run RL training (GRPO / RePO variants) via accelerate.
 Usage:
   bash scripts/run_RL_training.sh [--gpus 0,1] [--entry src/x_r1/grpo.py] [--config recipes/XXX.yaml]
                                  [--variant default|mumo|pure|noisy_demo|random_mask]
-                                 [--accelerate_config recipes/zero3.yaml] [--num_processes 2]
+                                 [--accelerate_config recipes/zero3.yaml] [--num_processes 1]
                                  [--output_dir /path/to/save_dir]
                                  [--port 29500] [--log_dir ./logs] [--log_file ./logs/your.log]
 
@@ -96,7 +106,9 @@ if [[ -n "$OUTPUT_DIR" ]]; then
   EXTRA_ARGS+=(--output_dir "$OUTPUT_DIR")
 fi
 
+# expandable_segments reduces allocator fragmentation, which is PyTorch's own OOM recommendation
 NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 \
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 CUDA_VISIBLE_DEVICES="$GPUS" ACCELERATE_LOG_LEVEL="$ACCELERATE_LOG_LEVEL" \
   accelerate launch \
     --config_file "$ACCELERATE_CONFIG" \

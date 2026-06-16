@@ -1,55 +1,58 @@
-name: momu_env
+name: momu
 channels:
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
-  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
+  - conda-forge
   - defaults
 dependencies:
-  - _libgcc_mutex=0.1=main
-  - _openmp_mutex=5.1=1_gnu
-  - ca-certificates=2025.2.25=h06a4308_0
-  - certifi=2021.5.30=py36h06a4308_0
-  - ld_impl_linux-64=2.40=h12ee557_0
-  - libffi=3.3=he6710b0_2
-  - libgcc-ng=11.2.0=h1234567_1
-  - libgomp=11.2.0=h1234567_1
-  - libstdcxx-ng=11.2.0=h1234567_1
-  - ncurses=6.4=h6a678d5_0
-  - openssl=1.1.1w=h7f8727e_0
-  - pip=21.2.2=py36h06a4308_0
-  - python=3.6.13=h12debd9_1
-  - readline=8.2=h5eee18b_0
-  - setuptools=58.0.4=py36h06a4308_0
-  - sqlite=3.45.3=h5eee18b_0
-  - tk=8.6.14=h39e8969_0
-  - wheel=0.37.1=pyhd3eb1b0_0
-  - xz=5.6.4=h5eee18b_1
-  - zlib=1.2.13=h5eee18b_1
+  - python=3.10
+  - pip
   - pip:
-      - anyio==3.6.2
-      - asgiref==3.4.1
-      - click==8.0.4
-      - contextlib2==21.6.0
-      - contextvars==2.4
-      - dataclasses==0.8
-      - decorator==4.4.2
-      - fastapi==0.83.0
-      - future==1.0.0
-      - h11==0.13.0
-      - idna==3.10
-      - immutables==0.19
-      - importlib-metadata==4.8.3
-      - joblib==1.1.1
-      - networkx==2.5.1
-      - numpy==1.19.5
-      - pillow==8.4.0
-      - pydantic==1.9.2
-      - rdkit-pypi==2021.9.4
-      - scikit-learn==0.21.3
-      - scipy==1.5.4
-      - sniffio==1.2.0
-      - starlette==0.19.1
-      - typing-extensions==4.1.1
-      - uvicorn==0.16.0
-      - zipp==3.6.0
+    # setuptools<80: pkg_resources was removed in setuptools 80.0 (April 2025); hyperopt/chemprop need it
+    - setuptools<80
+
+    # Distributed training launcher (used by run_RL_training.sh via `accelerate launch`)
+    - accelerate==1.1.1
+    - datasets==3.1.0
+    - deepspeed==0.15.4
+    - nvidia-cuda-nvcc-cu12  # provides nvcc binary for DeepSpeed CUDA_HOME detection
+
+    # HuggingFace ML stack (pinned to match mumo_requirements.txt)
+    - transformers==4.51.3  # >=4.48.2 for vllm; <4.52 avoids keep_torch_compile arg not yet in accelerate 1.1.1
+    - trl==0.15.0
+    - peft==0.14.0
+    - bitsandbytes==0.45.0
+    - safetensors==0.4.5
+    - sentencepiece==0.2.0
+    - tokenizers>=0.20.3   # vllm==0.7.2 upgrades this to 0.22.2
+    - huggingface-hub>=0.26.3  # vllm==0.7.2 upgrades this to 0.36.2
+    - wandb==0.18.7
+    - vllm==0.7.2         # pre-built wheel; used for fast generation (use_vllm: true in config)
+    - math-verify==0.5.2  # pulls in latex2sympy2_extended; used by rewards.py
+    - openai<2            # rewards.py passes api_key="" for local vLLM; openai>=2 rejects empty keys
+    # Note: flash_attn is NOT installed (no pre-built wheel); config uses attn_implementation: sdpa
+
+    # Property API servers (admetModel_api.py, drd2Model_api.py)
+    - fastapi==0.128.8
+    - uvicorn==0.40.0
+    - pydantic
+
+    # admet_ai and its required chain
+    - admet_ai==1.3.1
+    - chemprop==1.6.1
+    - descriptastorus==2.8.0
+    - hyperopt==0.2.7
+
+    # Chemistry
+    - rdkit==2024.3.6
+
+    # PyTorch pinned to <2.6: chemprop 1.6.1 uses torch.load() without weights_only=False
+    - torch==2.5.1
+
+    # Scientific stack (pinned to match mumo_requirements.txt)
+    - numpy==1.26.4
+    - scipy==1.14.1
+    - scikit-learn==1.5.2
+    - pandas==2.1.4
+    - networkx==3.4.2
+
+    # Misc
+    - requests==2.32.3

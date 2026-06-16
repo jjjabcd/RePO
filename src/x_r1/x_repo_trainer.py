@@ -450,6 +450,11 @@ class XGRPOTrainer(GRPOTrainer):
                 unwrapped_model.unmerge_adapter()
 
 
+    def _get_train_sampler(self, dataset=None):
+        # transformers>=4.48 calls _get_train_sampler(dataset); TRL 0.15.0 defines it without args.
+        # Delegate to parent (which uses self.train_dataset) to stay compatible with both.
+        return super()._get_train_sampler()
+
     # Get the per-token log probabilities for the completions for the model and the reference model
     def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
         # We add 1 to `logits_to_keep` because the last logits of the sequence is later excluded
