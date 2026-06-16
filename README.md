@@ -49,7 +49,8 @@ For MuMo multi-property training/evaluation, use a dedicated environment:
 ```bash
 conda create -n mumo python=3.10 -y
 conda activate mumo
-pip install -r mumo_requirements.txt
+conda env create -f environment.yml
+conda install -n momu -c nvidia/label/cuda-12.4.0 cuda-nvcc -y
 ```
 
 ### 2) MuMo Property Servers
